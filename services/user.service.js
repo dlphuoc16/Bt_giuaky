@@ -18,11 +18,12 @@ const createUser = async (body) => {
   return user;
 };
 
-const updateUser = async (id, body) => {
+const updateUser = async (userId, id, body) => {
   const { email, fullName, dateOfBirth, address, nationality, password } = body;
   const user = await User.findByIdAndUpdate(
     id,
     {
+      userId,
       email,
       fullName,
       dateOfBirth,

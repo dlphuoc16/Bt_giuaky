@@ -1,12 +1,20 @@
 const express = require("express");
 const jwt = require("jsonwebtoken");
 const { User, userSchema } = require("./models/user.model.js");
-const { Profile, profileSchema } = require("./models/profile.model");
-const userRouter = require("./controllers/user.controller");
+const Profile = require("./models/profile.model.js");
+const userRouter = require("./controllers/user.controller.js");
+const middlewareService = require("./services/middleware.service.js");
 const bcrypt = require("bcrypt");
 const app = express();
 const port = 3000;
 app.use(express.json());
+app.use((req, res, next) => {
+  if (req.path === "/register" || req.path === "/login") {
+    return next();
+  }
+  middlewareService.authMiddleware(req, res, next);
+});
+app.use("/users", userRouter);
 
 const mongoose = require("mongoose");
 mongoose
@@ -17,7 +25,6 @@ mongoose
   .catch((error) => {
     console.log("Error:", error);
   });
-
 app.post("/register", async (req, res) => {
   try {
     const {
@@ -31,7 +38,6 @@ app.post("/register", async (req, res) => {
       hobbies,
       personalGoals,
     } = req.body;
-
     const existingUser = await User.findOne({ email });
     if (existingUser) {
       return res.status(400).json({ message: "Email already exists" });
@@ -81,6 +87,44 @@ app.post("/login", async (req, res) => {
     res.json({ token });
   } catch (error) {
     console.error("Login error:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+app.put("/profiles/:id", async (req, res) => {
+  try {
+    const profileId = req.params.id;
+    const updatedFields = req.body;
+    const profile = await Profile.findById(profileId);
+    if (!profile) {
+      return res.status(404).json({ message: "Profile not found" });
+    }
+    Object.assign(profile, updatedFields);
+    await profile.save();
+
+    res.status(200).json({ message: "Profile updated successfully" });
+  } catch (error) {
+    console.error("Update profile error:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+app.delete("/profiles/:id", async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const profileId = req.params.id;
+    const profile = await Profile.findById(profileId);
+    if (!profile) {
+      return res.status(404).json({ message: "Profile not found" });
+    }
+    if (profile.userId.toString() !== userId.toString()) {
+      return res.status(403).json({ message: "Unauthorized" });
+    }
+    await Profile.findByIdAndDelete(profileId);
+
+    res.status(200).json({ message: "Profile deleted successfully" });
+  } catch (error) {
+    console.error("Delete profile error:", error);
     res.status(500).json({ message: "Internal server error" });
   }
 });
